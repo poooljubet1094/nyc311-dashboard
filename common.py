@@ -129,6 +129,9 @@ CSS = """
               background: rgba(255,255,255,.65); box-shadow: 0 1px 3px rgba(0,0,0,.07);}
   .rule-title {font-weight: 600; font-size: .95rem; margin-bottom: 6px;}
   .rule-meta {font-size: .82rem; opacity: .85; display: flex; flex-wrap: wrap; gap: 16px;}
+  .app-footer {margin-top: 3rem; padding-top: 1rem; border-top: 1px solid rgba(20,33,61,.12);
+               text-align: center; font-size: .8rem; line-height: 1.6; opacity: .75;}
+  .app-footer strong {font-weight: 600;}
   @media (prefers-color-scheme: dark) {
     .kpi, .rule-card {background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.14);}
     .good {color: #3ccf3c;} .bad {color: #ff7b72;}
@@ -139,6 +142,16 @@ CSS = """
 
 def page_setup():
     st.markdown(CSS, unsafe_allow_html=True)
+
+
+def page_footer():
+    st.markdown(
+        "<div class='app-footer'>"
+        "<strong>Paul Jovit Calibuso · Wencel De Lara · Khimmy Joy Daquioag</strong><br>"
+        "PSM in Data Science · Data Visualization"
+        "</div>",
+        unsafe_allow_html=True,
+    )
 
 
 def kpi_card(label, value, delta_html="", note=""):

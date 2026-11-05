@@ -4,7 +4,7 @@ Run locally:  streamlit run app.py
 """
 import streamlit as st
 
-from common import load_data, page_setup
+from common import load_data, page_footer, page_setup
 
 st.set_page_config(page_title="NYC311 CSAT Dashboards", page_icon=":material/support_agent:", layout="wide")
 page_setup()
@@ -26,3 +26,4 @@ with st.sidebar:
                "(https://data.cityofnewyork.us/Social-Services/311-Customer-Satisfaction-Survey/kizp-4dfk)")
 
 nav.run()
+page_footer()
