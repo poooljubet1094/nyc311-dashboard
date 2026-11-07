@@ -5,11 +5,14 @@ An interactive Python (Streamlit + Plotly) web dashboard with one page for each 
 | Page | Audience | What it shows |
 | --- | --- | --- |
 | **Overview** | Everyone | Headline KPIs, business context, data cleaning |
-| **Lower level · Operational** | Floor supervisors, team leads, QA leads | KPI scorecard vs the previous campaign, daily CSAT trend, rating mix by service area, weekly problem heat map, language queue performance, daily exceptions report, customer follow-up log. Filter: campaign |
-| **Middle level · Tactical** | Operations and QA managers | KPI strip, quarterly CSAT and NPS trend, favorable rating by driver, satisfaction mix by campaign, language segment bubble chart. Filter: year range |
-| **Top level · Strategic** | NYC311 leadership | Overall NPS split, survey volume heat map and yearly growth, decision-tree feature importance and tipping points, Apriori NPS driver cards |
+| **Lower level · Operational** | Floor supervisors, team leads, QA leads | KPI cards with six-campaign sparklines, automatic alert banner, daily **control chart (p-chart, 3σ limits)** with **click-a-day snapshot**, campaign pacing vs the same campaign last year, rating mix, weekly problem heat map, language queues with **95% confidence intervals**, exceptions report with a control check, filterable follow-up log with **CSV export**. Filter: campaign |
+| **Middle level · Tactical** | Operations and QA managers | KPI strip, CSAT and NPS trend by **campaign, quarter or month** with **significance tests**, **department × KPI heat map**, satisfaction mix by campaign, language bubble chart, **fix-first matrix**, feature importance and **decision tree**, survey responses by month. Filter: year range |
+| **Top level · Strategic** | NYC311 leadership | **Summary indicators** with year-over-year change, **strategic scorecard vs targets**, **year-over-year growth**, **2026 forecast with 95% prediction intervals**, **Local Law 26 compliance**, Apriori opportunity and risk cards |
+| **Visualization map** | Everyone | Which visual serves which management level, the brief's question it answers, and why its form fits |
 
-Every visual has a collapsible **Analysis** panel with its Description, Insight, Interpretation and Recommendation. The sidebar switch **Show analysis notes** hides them all for a clean demo.
+Every visual has a collapsible **Analysis** panel written like the conclusion and recommendation section of a research paper: first a description of the graph, then a conclusion paragraph (the findings, ending in *"It can be concluded that…"*), then a recommendation paragraph (*"It is recommended that…"*). Each level page ends with an overall **Conclusion and recommendations** section with numbered recommendations and owners. The sidebar switch **Show analysis notes** hides them all for a clean demo.
+
+**Hover to learn what things mean:** KPI labels (dotted underline), section headings and filters (ⓘ icons), table column headers, scorecard KPI names and Apriori card terms all show a short definition on hover. Definitions live in `TIPS` in `common.py`.
 
 Data: [NYC311 Customer Satisfaction Survey](https://data.cityofnewyork.us/Social-Services/311-Customer-Satisfaction-Survey/kizp-4dfk) (NYC Open Data), included in `data/`.
 
@@ -53,12 +56,14 @@ streamlit run app.py --server.port $PORT --server.address 0.0.0.0
 nyc311_dashboard/
 ├── app.py              # entry point: page config, navigation, sidebar
 ├── common.py           # data loading + cleaning, KPI helpers, colours, card styles
+├── models.py           # Apriori rules, decision tree and shared figures
 ├── narrative.py        # written analysis for every visual (edit text here)
 ├── views/
 │   ├── overview.py
 │   ├── lower.py        # Operational dashboard
 │   ├── middle.py       # Tactical dashboard
-│   └── top.py          # Strategic dashboard
+│   ├── top.py          # Strategic dashboard
+│   └── levels.py       # Visualization map (level-fit analysis)
 ├── data/311_Customer_Satisfaction_Survey.csv
 ├── .streamlit/config.toml
 └── requirements.txt
@@ -75,3 +80,5 @@ nyc311_dashboard/
 
 - The written analysis on the lower level describes **2025 Campaign 5**, and the middle level's describes the **full 2020–2025 range**. When you change those filters, the charts update and the analysis notes are hidden.
 - The 80% CSAT target is a working target for this dashboard (historical CSAT is 80.9%), not an official NYC311 figure.
+- Top-level scorecard targets: CSAT 85% and Answer Satisfaction 75% come from the middle-level recommendations; NPS 60 and % Unfavorable 10% are illustrative. Change them in `views/top.py` (`SCORECARD`).
+- The forecast is a straight-line projection of the 26 past campaigns with a 95% prediction interval. It shows where the current path leads, not what a new program could achieve.

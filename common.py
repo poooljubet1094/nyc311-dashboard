@@ -110,13 +110,46 @@ def nps_score(s) -> float:
     return float(((s >= 9).mean() - (s <= 6).mean()) * 100) if len(s) else np.nan
 
 
+# ---- Glossary used for hover tooltips ----
+TIPS = {
+    "responses": "Completed survey responses. Each response is one caller who answered the survey after a 311 call.",
+    "csat": "Customer satisfaction: the % of callers who rated Overall Satisfaction 4 or 5 (Agree or Strongly Agree) on the 1–5 scale.",
+    "nps": "Net Promoter Score: % of promoters (rated 9–10 on 'would you recommend 311?') minus % of detractors (0–6). Ranges from −100 to +100.",
+    "wait": "% of callers who rated Wait Time 4 or 5: they agreed the wait to reach an agent was acceptable.",
+    "answer": "% of callers who rated Answer Satisfaction 4 or 5: they were satisfied with the answer or outcome they received.",
+    "agent": "% of callers who rated Agent Customer Service 4 or 5: the agent was courteous and helpful.",
+    "knowledge": "% of callers who rated Agent Job Knowledge 4 or 5: the agent knew how to handle the request.",
+    "dissatisfied": "Callers who rated Overall Satisfaction 1 or 2 (Strongly Disagree or Disagree).",
+    "unfavorable": "% of callers who rated Overall Satisfaction 1 or 2.",
+    "promoters": "Callers who scored 9–10 on the recommend question: likely to speak well of 311.",
+    "passives": "Callers who scored 7–8: satisfied but not enthusiastic. They count in neither side of NPS.",
+    "detractors": "Callers who scored 0–6: unlikely to recommend 311.",
+    "target": "Working CSAT target for this dashboard (80%), close to the 80.9% historical average. Not an official NYC311 figure.",
+    "control": "3-sigma control limits: the range a day's CSAT would normally fall in given its number of responses. Outside the range = statistically unusual.",
+    "ci": "95% confidence interval: the range the true value very likely falls in. Wide when a group has few responses.",
+    "low_score": "A response with Overall Satisfaction 1–2 or an NPS score of 0–6. These callers are candidates for follow-up.",
+    "priority": "High = Overall Satisfaction 1 or NPS 0–3. Medium = any other low-score response.",
+    "weakest": "The lowest-rated of the four service drivers (Wait, Agent service, Job knowledge, Answer) in that response.",
+    "reliability": "Confidence: when callers have this rating combination, the chance they end up in this NPS group.",
+    "share": "Support: the % of all callers who have this rating combination.",
+    "impact": "Lift: how many times more likely this NPS group is for callers with the combination than for callers overall. Above 1 = positive link.",
+    "p_value": "The chance of seeing a trend this strong if there were really no trend. Below 0.05 = statistically significant.",
+}
+
 # ---- Page furniture ----
 CSS = """
 <style>
+  .tip {position: relative; cursor: help; border-bottom: 1px dotted currentColor;}
+  .tip:hover::after {content: attr(data-tip); position: absolute; left: 0; top: 100%; margin-top: 6px; z-index: 9999;
+       background: #1d2433; color: #fff; padding: 8px 10px; border-radius: 6px; font-size: .78rem; line-height: 1.4;
+       width: max-content; max-width: 280px; white-space: normal; text-transform: none; letter-spacing: 0; font-weight: 400;
+       box-shadow: 0 4px 14px rgba(0,0,0,.18);}
+  .tip-r:hover::after {left: auto; right: 0;}
+  [data-testid="stMarkdownContainer"], [data-testid="stElementContainer"] {overflow: visible !important;}
   .block-container, [data-testid="stMainBlockContainer"] {padding-top: 4.5rem !important; max-width: 1280px;}
   h1, h2, h3 {letter-spacing: -0.01em;}
   .kpi {border: 1px solid rgba(20,33,61,.12); border-radius: 10px; padding: 14px 16px; background: rgba(255,255,255,.6);}
-  .kpi-label {font-size: .74rem; text-transform: uppercase; letter-spacing: .06em; opacity: .7;}
+  .kpi-label {font-size: .74rem; text-transform: uppercase; letter-spacing: .06em; color: #5b6170;}
   .kpi-value {font-size: 1.9rem; font-weight: 600; line-height: 1.15; margin-top: 2px;}
   .kpi-delta {font-size: .8rem; font-weight: 600; margin-top: 2px;}
   .kpi-note {font-size: .74rem; opacity: .65; margin-top: 4px;}
@@ -128,10 +161,7 @@ CSS = """
   .rule-card {border-left: 5px solid; border-radius: 6px; padding: 12px 16px; margin-bottom: 10px;
               background: rgba(255,255,255,.65); box-shadow: 0 1px 3px rgba(0,0,0,.07);}
   .rule-title {font-weight: 600; font-size: .95rem; margin-bottom: 6px;}
-  .rule-meta {font-size: .82rem; opacity: .85; display: flex; flex-wrap: wrap; gap: 16px;}
-  .app-footer {margin-top: 3rem; padding-top: 1rem; border-top: 1px solid rgba(20,33,61,.12);
-               text-align: center; font-size: .8rem; line-height: 1.6; opacity: .75;}
-  .app-footer strong {font-weight: 600;}
+  .rule-meta {font-size: .82rem; color: #3a4152; display: flex; flex-wrap: wrap; gap: 16px;}
   @media (prefers-color-scheme: dark) {
     .kpi, .rule-card {background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.14);}
     .good {color: #3ccf3c;} .bad {color: #ff7b72;}
@@ -144,20 +174,36 @@ def page_setup():
     st.markdown(CSS, unsafe_allow_html=True)
 
 
-def page_footer():
-    st.markdown(
-        "<div class='app-footer'>"
-        "<strong>Paul Jovit Calibuso · Wencel De Lara · Khimmy Joy Daquioag</strong><br>"
-        "PSM in Data Science · Data Visualization"
-        "</div>",
-        unsafe_allow_html=True,
-    )
+def tip(label, text, right=False):
+    """Inline label with a hover tooltip (dotted underline)."""
+    import html as _html
+    if not text:
+        return label
+    return f"<span class='tip{' tip-r' if right else ''}' data-tip='{_html.escape(text, quote=True)}'>{label}</span>"
 
 
-def kpi_card(label, value, delta_html="", note=""):
+KPI_LABEL_TIPS = {
+    "Survey responses": "responses", "Surveys analysed": "responses", "Respondents": "responses",
+    "CSAT (Overall 4–5)": "csat", "CSAT (% favorable)": "csat", "Net Promoter Score": "nps",
+    "Wait time rated OK": "wait", "Answer satisfaction": "answer", "Dissatisfied callers": "dissatisfied",
+    "% Unfavorable": "unfavorable",
+}
+
+
+def col_help(mapping):
+    """column_config entries that show a tooltip when hovering a table header."""
+    return {name: st.column_config.Column(help=text) for name, text in mapping.items()}
+
+
+def kpi_card(label, value, delta_html="", note="", spark=None, spark_note="", help=None, tip_right=False):
+    help = help or TIPS.get(KPI_LABEL_TIPS.get(label, ""), None)
+    label = tip(label, help, tip_right)
+    spark_html = ""
+    if spark is not None and len(spark) > 1:
+        spark_html = sparkline_svg(spark) + (f"<div class='kpi-note' style='margin-top:0'>{spark_note}</div>" if spark_note else "")
     st.markdown(
         f"<div class='kpi'><div class='kpi-label'>{label}</div><div class='kpi-value'>{value}</div>"
-        f"<div class='kpi-delta'>{delta_html}</div><div class='kpi-note'>{note}</div></div>",
+        f"<div class='kpi-delta'>{delta_html}</div><div class='kpi-note'>{note}</div>{spark_html}</div>",
         unsafe_allow_html=True,
     )
 
@@ -172,10 +218,73 @@ def delta_html(now, before, unit=" pt", higher_is_better=True, digits=1):
 
 
 def analysis(block: dict):
-    """Render the four-part analysis required by the project brief."""
+    """Render the written analysis in research-paper style, without part labels.
+
+    1. A description of the graph.
+    2. A conclusion paragraph: the findings, ending in what can be concluded.
+    3. A recommendation paragraph.
+    """
     if not st.session_state.get("show_analysis", True):
         return
-    with st.expander("Analysis — description, insight, interpretation, recommendation", expanded=False):
-        for key, title in [("description", "1. Description"), ("insight", "2. Insight"),
-                           ("interpretation", "3. Interpretation"), ("recommendation", "4. Recommendation")]:
-            st.markdown(f"**{title}** — {block[key]}")
+    with st.expander("Analysis", expanded=False, icon=":material/notes:"):
+        st.markdown(block["description"])
+        st.markdown(block.get("conclusion") or f"{block['insight']} {block['interpretation']}")
+        st.markdown(block.get("recommend") or block["recommendation"])
+
+
+def page_conclusion(entry, owner_label="Responsible"):
+    """Closing section: an overall conclusion paragraph and numbered recommendations, as in a research paper."""
+    if not st.session_state.get("show_analysis", True):
+        return
+    conclusion, recs = entry
+    st.subheader("Conclusion and recommendations",
+                 help="The overall conclusion from this page's charts and the recommended actions, written as in the "
+                      "conclusion and recommendation section of a research paper.")
+    st.markdown(conclusion)
+    st.markdown("Based on these conclusions, the following are recommended:\n\n" +
+                "\n".join(f"{i}. {text} *({owner_label}: {owner})*" for i, (text, owner) in enumerate(recs, 1)))
+
+
+# ---- Advanced helpers ----
+def wilson(k, n, z=1.96):
+    """95% Wilson score interval for a proportion, returned in percent (low, high)."""
+    if n == 0:
+        return (np.nan, np.nan)
+    p = k / n
+    den = 1 + z * z / n
+    centre = (p + z * z / (2 * n)) / den
+    half = z * np.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / den
+    return (centre - half) * 100, (centre + half) * 100
+
+
+def sparkline_svg(values, width=120, height=28, color="#2a78d6"):
+    """Tiny inline SVG trend line with an emphasised last point."""
+    v = [float(x) for x in values if pd.notna(x)]
+    if len(v) < 2:
+        return ""
+    lo, hi = min(v), max(v)
+    span = (hi - lo) or 1
+    xs = [i * (width - 6) / (len(v) - 1) + 3 for i in range(len(v))]
+    ys = [height - 4 - (x - lo) / span * (height - 8) for x in v]
+    pts = " ".join(f"{x:.1f},{y:.1f}" for x, y in zip(xs, ys))
+    return (f"<svg width='{width}' height='{height}' viewBox='0 0 {width} {height}' style='display:block;margin-top:4px'>"
+            f"<polyline points='{pts}' fill='none' stroke='{color}' stroke-width='1.6' stroke-linejoin='round' stroke-linecap='round' opacity='.75'/>"
+            f"<circle cx='{xs[-1]:.1f}' cy='{ys[-1]:.1f}' r='2.6' fill='{color}'/></svg>")
+
+
+def trend_fit(x, y, x_new=None, level=0.95):
+    """OLS line with slope p-value and prediction interval (for forecasts)."""
+    from scipy import stats
+    x, y = np.asarray(x, float), np.asarray(y, float)
+    n = len(x)
+    res = stats.linregress(x, y)
+    out = {"slope": res.slope, "intercept": res.intercept, "p": res.pvalue, "r2": res.rvalue ** 2}
+    if x_new is not None:
+        x_new = np.asarray(x_new, float)
+        resid = y - (res.intercept + res.slope * x)
+        s = np.sqrt((resid ** 2).sum() / (n - 2))
+        t = stats.t.ppf((1 + level) / 2, n - 2)
+        se = s * np.sqrt(1 + 1 / n + (x_new - x.mean()) ** 2 / ((x - x.mean()) ** 2).sum())
+        pred = res.intercept + res.slope * x_new
+        out.update(pred=pred, lo=pred - t * se, hi=pred + t * se)
+    return out

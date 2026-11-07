@@ -19,16 +19,16 @@ with c[2]:
 with c[3]:
     kpi_card("Answer satisfaction", f"{top2(df['answer_satisfaction']):.1f}%", "", "The weakest service driver")
 
-st.subheader("Choose a management level")
+st.subheader("Choose a management level", help="Each level has its own dashboard, built around the questions that level of management needs answered.")
 cols = st.columns(3, gap="medium")
 levels = [
     ("views/lower.py", "Lower level · Operational", "Floor supervisors, team leads, QA leads",
-     "What happened each day, which responses need follow-up, which service areas and language queues performed poorly. "
-     "Filter by campaign."),
+     "Control chart with alerts, click-a-day snapshot, campaign pacing, service areas, queue confidence intervals, "
+     "exceptions report and follow-up log. Filter by campaign."),
     ("views/middle.py", "Middle level · Tactical", "Operations and quality-assurance managers",
-     "Quarterly CSAT and NPS trends, service-driver comparison, campaign mix and language segments. Filter by year."),
+     "Trends by campaign, quarter or month; department heat map; campaign mix; segments; fix-first matrix and decision tree; survey volume by month. Filter by year."),
     ("views/top.py", "Top level · Strategic", "NYC311 leadership",
-     "Overall NPS, survey coverage growth, the decision tree and Apriori rules that show what actually drives NPS."),
+     "Summary indicators, strategic scorecard vs targets, year-over-year growth, 2026 forecast, Local Law 26 compliance, and opportunity and risk cards."),
 ]
 for col, (path, title, who, what) in zip(cols, levels):
     with col:
@@ -38,7 +38,10 @@ for col, (path, title, who, what) in zip(cols, levels):
             st.write(what)
             st.page_link(path, label="Open dashboard", icon=":material/arrow_forward:")
 
-st.subheader("Business context")
+st.page_link("views/levels.py", label="See which visualization serves which management level, and why",
+             icon=":material/account_tree:")
+
+st.subheader("Business context", help="The organization, problem and objectives behind these dashboards.")
 st.markdown(f"""
 | | |
 | --- | --- |
